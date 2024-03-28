@@ -6,7 +6,7 @@ const bcrypt = require('bcrypt')
 //get all users
 const getAllUsers = async (req, res) => {
     try {
-        const data = await db.query('SELECT u.*, d.department_name FROM userdata u JOIN department d ON u.departmentId = d.id')
+        const data = await db.query('SELECT u.*, d.department_name FROM userdata u JOIN department d ON u.departmentId = d.id WHERE deleted_at IS NULL')
         if (!data) {
             return res.status(404).send({
                 message: 'no records found'
@@ -100,6 +100,7 @@ const addUser = async (req, res) => {
 //update user by id
 
 const updateUser = async (req, res) => {
+    
     try {
 
         const userId = req.params.id
@@ -140,9 +141,14 @@ const updateUser = async (req, res) => {
 
 //delete user by id
 
-const deleteUser = async (req, res) => {
+
+//login api
+
+const loginuser = async (req, res) => {
+
 
     try {
+
         const userId = req.params.id
         if (!userId) {
             return res.status(404).send({
@@ -150,19 +156,100 @@ const deleteUser = async (req, res) => {
             })
         }
 
-        await db.query(`DELETE FROM userdata WHERE id = ?`, [userId])
-        res.send(200).send({
-            message: 'deletes user!'
+        const {  email, password} = req.body
+        const hashedPassword = await bcrypt.hash(password, 10)
+
+        //check for existing email id
+        const [existingEmail] = await db.query('SELECT * FROM userdata WHERE email = ?', [email]);
+
+        const isPasswordValid = bcrypt.compare(
+            `${req.body.password}`,
+            userdata.password
+        );
+
+        const [existingPassoword] = await db.query('SELECT * FROM userdata WHERE email = ?', [isPasswordValid]);
+
+        
+
+        if (existingEmail.length > 0) {
+            return res.status(409).send({ message: 'Email already exists' });
+        }
+
+        if (existingPassoword.length > 0) {
+            return res.status(409).send({ message: 'password already exists' });
+        }
+
+        const data = db.query("UPDATE userdata SET firstName = ?, lastName = ?, email = ?, password = ?, gender = ?, hobbies = ?, departmentId = ? WHERE id = ?", [firstName, lastName, email, hashedPassword, gender, hobbies, departmentId, userId])
+
+        if (!data) {
+            return res.status(500).send({
+                message: 'error in update data'
+            })
+        }
+        res.status(200).send({
+            message: 'data updated!'
         })
 
     } catch (error) {
         console.log(error)
-        res.status(500).send({
-            message: 'error in delete api'
+        res.send({
+            message: 'error in addUser api!'
         })
-    }
 
+    }
 }
+  
+
+
+const deleteUser = async (req, res) => {
+    try {
+      const userId = req.params.id;
+      if (!userId) {
+        return res.status(404).send({
+          message: 'invalid id'
+        });
+      }
+  
+      // Set the `deleted_at` column to the current date and time
+      await db.query(`UPDATE userdata SET deleted_at = NOW() WHERE id = ?`, [userId]);
+  
+      res.send(200).send({
+        message: 'soft deletes user!'
+      });
+  
+    } catch (error) {
+      console.log(error);
+      res.status(500).send({
+        message: 'error in delete API'
+      });
+    }
+  }
+
+
+// const deleteUser = async (req, res) => {
+
+//     try {
+        
+//         const userId = req.params.id
+//         if (!userId) {
+//             return res.status(404).send({
+//                 message: 'invalid id'
+//             })
+//         }
+
+//         await db.query(`DELETE FROM userdata WHERE id = ?`, [userId])
+//         res.send(200).send({
+//             message: 'deletes user!'
+//         })
+
+//     } catch (error) {
+//         console.log(error)
+//         res.status(500).send({
+//             message: 'error in delete api'
+//         })
+//     }
+
+// }
 
 //get all users by department id
 
